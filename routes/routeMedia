@@ -1,0 +1,125 @@
+const express = require('express');
+const router = express.Router()
+const modeloMedia = require('../models/media')
+const mongoose = require('mongoose');
+const Productora = require('../models/productora');
+const Genero = require('../models/genero');
+const Director = require('../models/director');
+const Tipo = require('../models/tipo');
+
+
+// POST Method
+router.post('/post', async (req, res) => {
+    const { serial, titulo, sinopsis, urlPelicula, imagenPortada, anhoEstreno, generoPrincipal, directorPrincipal, productora, tipo } = req.body;
+
+    try {
+        // Verificar si los ObjectIds existen en sus respectivas colecciones
+        const [genero, director, productoraData, tipoData] = await Promise.all([
+            Genero.findById(generoPrincipal),
+            Director.findById(directorPrincipal),
+            Productora.findById(productora),
+            Tipo.findById(tipo)
+        ]);
+
+        if (!genero || !director || !productoraData || !tipoData) {
+            return res.status(400).json({ message: 'No se encontró una o más entradas correspondientes.' });
+        }
+
+        // Crear el medio
+        const media = new modeloMedia({
+            serial,
+            titulo,
+            sinopsis,
+            urlPelicula,
+            imagenPortada,
+            anhoEstreno,
+            generoPrincipal,
+            directorPrincipal,
+            productora,
+            tipo
+        });
+
+        const savedMedia = await media.save();
+
+        // Obtener los nombres asociados a los ObjectId
+        const generoNombre = genero.nombre;
+        const directorNombre = director.nombre;
+        const productoraNombre = productoraData.nombre;
+        const tipoNombre = tipoData.nombre;
+
+        // Modificar la respuesta para incluir los nombres asociados
+        const response = {
+            ...savedMedia.toJSON(),
+            generoPrincipal: generoNombre,
+            directorPrincipal: directorNombre,
+            productora: productoraNombre,
+            tipo: tipoNombre
+        };
+
+        res.status(200).json(response);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+});
+
+// Get all Method
+router.get('/getAll', async (req, res) => {
+    try {
+        const data = await modeloMedia.find().populate({
+            path: 'generoPrincipal directorPrincipal productora tipo',
+            select: 'nombre'
+        });
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ message: error.message })
+    }
+});
+
+// Get by ID
+
+router.get('/getOne/:id', async (req, res) => {
+    try {
+        const data = await modeloMedia.findById(req.params.id).populate({
+            path: 'generoPrincipal directorPrincipal productora tipo',
+            select: 'nombre'
+        });
+        res.json(data)
+    } catch (error) {
+        res.status(500).json({ message: error.message })
+    }
+});
+
+
+//Update by ID Method
+router.patch('/update/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const updatedData = req.body;
+        const options = { new: true };
+
+        const result = await modeloMedia.findByIdAndUpdate(
+            id, updatedData, options
+        )
+
+        res.send(result)
+    }
+    catch (error) {
+        res.status(400).json({ message: error.message })
+    }
+});
+
+
+//Delete by ID Method
+router.delete('/delete/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const data = await modeloMedia.findByIdAndDelete(id)
+        res.send(`Document with ${data.name} has been deleted..`)
+    }
+    catch (error) {
+        res.status(400).json({ message: error.message })
+    }
+})
+
+
+module.exports = router;
